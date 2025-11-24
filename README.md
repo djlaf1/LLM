@@ -25,4 +25,4 @@ A powerful command-line AI chatbot built with PyTorch transformer architecture, 
 
 ### Core Requirements
 ```bash
-pip install torch numpy
+pip install torch numpy jedi
