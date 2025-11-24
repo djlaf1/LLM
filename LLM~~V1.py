@@ -1,4 +1,8 @@
-"MIT License - Copyright (c) 2025 djlaf1"
+#!/usr/bin/env python3
+"""
+ULTIMATE AI CHAT - TRANSFORMER ARCHITECTURE (CLI VERSION)
+MIT License - Copyright (c) 2025 djlaf1
+"""
 
 import torch
 import torch.nn as nn
@@ -11,6 +15,7 @@ import argparse
 import sys
 import os
 from datetime import datetime
+import threading
 
 class UltimateConfig:
     vocab_size: int = 50000
@@ -155,6 +160,7 @@ class UltimateAI:
         self.training_losses = []
         self.training_epochs = 0
         self.best_loss = float('inf')
+        self.training_in_progress = False
         self.setup_vocab()
         self.setup_model()
         
@@ -281,13 +287,18 @@ class UltimateAI:
         return torch.tensor(inputs, dtype=torch.long), torch.tensor(targets, dtype=torch.long)
     
     def train(self, epochs=100):
+        if self.training_in_progress:
+            return "Training already in progress!"
+            
         if self.model is None:
             return "Model not initialized!"
             
         try:
+            self.training_in_progress = True
             inputs_tensor, targets_tensor = self.prepare_training_batch()
             
             if inputs_tensor.size(1) > self.config.block_size:
+                self.training_in_progress = False
                 return f"Sequence length {inputs_tensor.size(1)} exceeds block size {self.config.block_size}"
             
             self.model.train()
@@ -299,6 +310,7 @@ class UltimateAI:
                 logits, loss = self.model(inputs_tensor, targets_tensor)
                 
                 if torch.isnan(loss):
+                    self.training_in_progress = False
                     return "Training failed: Loss became NaN"
                 
                 loss.backward()
@@ -312,13 +324,15 @@ class UltimateAI:
                     self.best_loss = loss.item()
                     self.save_model()
                 
-                if epoch % 50 == 0:
+                if epoch % 1 == 0:
                     print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
                     
             self.training_losses.extend(losses)
+            self.training_in_progress = False
             return f"Training completed! Final loss: {losses[-1]:.4f}, Best loss: {self.best_loss:.4f}"
             
         except Exception as e:
+            self.training_in_progress = False
             return f"Training error: {str(e)}"
     
     def generate_response(self, message):
@@ -416,9 +430,9 @@ class CLIChat:
         
     def print_banner(self):
         print("=" * 70)
-        print("AI")
+        print("ULTIMATE AI CHAT - TRANSFORMER ARCHITECTURE")
         print("=" * 70)
-        print("Model: trabsformer | Embeddings: 768-dim")
+        print("Model: GPT-style Transformer | Embeddings: 768-dim")
         print("Heads: 12 | Layers: 12 | Context: 1024 tokens")
         print("=" * 70)
         print("Type 'train' to train the model")
@@ -448,10 +462,19 @@ class CLIChat:
         print("\nConversation history cleared.")
         
     def train_model(self):
-        print("\nStarting model training...")
-        print("This may take a few moments...")
-        result = self.ai.train(epochs=500)
-        print(f"\n{result}")
+        if self.ai.training_in_progress:
+            print("Training already in progress!")
+            return
+            
+        print("\nStarting model training in background...")
+        print("You can continue chatting while training runs!")
+        
+        def train_thread():
+            result = self.ai.train(epochs=100)
+            print(f"\nTraining completed: {result}")
+            
+        thread = threading.Thread(target=train_thread, daemon=True)
+        thread.start()
         
     def chat_loop(self):
         self.print_banner()
@@ -509,7 +532,7 @@ class CLIChat:
 def main():
     parser = argparse.ArgumentParser(description='Ultimate AI Chat with Transformer Architecture')
     parser.add_argument('--train', action='store_true', help='Train the model before chatting')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of training epochs')
     
     args = parser.parse_args()
     
